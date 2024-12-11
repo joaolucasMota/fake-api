@@ -7,6 +7,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Função para formatar CPF
+function formatarCPF(cpf) {
+    // Remove todos os caracteres não numéricos
+    const numeros = cpf.replace(/\D/g, '');
+    
+    // Retorna CPF formatado (xxx.xxx.xxx-xx)
+    return numeros.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
 // Listar todos os beneficiários
 app.get('/beneficiarios', (req, res) => {
     const { nome, cpf } = req.query;
@@ -19,8 +28,9 @@ app.get('/beneficiarios', (req, res) => {
     }
 
     if (cpf) {
+        const cpfFormatado = formatarCPF(cpf);
         beneficiariosFiltrados = beneficiariosFiltrados.filter(b => 
-            b.cpf.includes(cpf)
+            b.cpf.includes(cpfFormatado)
         );
     }
 
@@ -45,8 +55,10 @@ app.post('/beneficiarios', (req, res) => {
         return res.status(400).json({ mensagem: "Nome completo e CPF são obrigatórios" });
     }
 
+    const cpfFormatado = formatarCPF(cpf);
+
     // Verificar se CPF já existe
-    const cpfExistente = dados.beneficiarios.some(b => b.cpf === cpf);
+    const cpfExistente = dados.beneficiarios.some(b => b.cpf === cpfFormatado);
     if (cpfExistente) {
         return res.status(400).json({ mensagem: "CPF já cadastrado" });
     }
@@ -54,7 +66,7 @@ app.post('/beneficiarios', (req, res) => {
     const novoBeneficiario = {
         id: dados.beneficiarios.length + 1,
         nomeCompleto,
-        cpf,
+        cpf: cpfFormatado,
         creditos: []
     };
 
@@ -72,16 +84,21 @@ app.put('/beneficiarios/:id', (req, res) => {
         return res.status(404).json({ mensagem: "Beneficiário não encontrado" });
     }
 
-    // Verificar se o novo CPF já existe em outro beneficiário
-    const cpfExistente = dados.beneficiarios.some(b => b.cpf === cpf && b.id !== id);
-    if (cpfExistente) {
-        return res.status(400).json({ mensagem: "CPF já cadastrado para outro beneficiário" });
+    let cpfFormatado = undefined;
+    if (cpf) {
+        cpfFormatado = formatarCPF(cpf);
+        
+        // Verificar se o novo CPF já existe em outro beneficiário
+        const cpfExistente = dados.beneficiarios.some(b => b.cpf === cpfFormatado && b.id !== id);
+        if (cpfExistente) {
+            return res.status(400).json({ mensagem: "CPF já cadastrado para outro beneficiário" });
+        }
     }
 
     dados.beneficiarios[beneficiarioIndex] = {
         ...dados.beneficiarios[beneficiarioIndex],
         nomeCompleto: nomeCompleto || dados.beneficiarios[beneficiarioIndex].nomeCompleto,
-        cpf: cpf || dados.beneficiarios[beneficiarioIndex].cpf
+        cpf: cpfFormatado || dados.beneficiarios[beneficiarioIndex].cpf
     };
 
     res.json(dados.beneficiarios[beneficiarioIndex]);
